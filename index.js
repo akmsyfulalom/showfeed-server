@@ -7,6 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
+
 app.use(cors());
 
 
@@ -73,7 +74,7 @@ async function run() {
         })
 
 
-        app.get('/comments', async (req, res) => {
+        app.get('/viewPostComments', async (req, res) => {
             const iDComment = req.query.id;
             const body = req.body;
             const query = { id: iDComment };
@@ -81,40 +82,44 @@ async function run() {
             res.send(comments);
         });
 
-        app.put("/like/:id", async (req, res) => {
+        app.get('/likes', async (req, res) => {
+            const likes = await postsCollection.find({}).project({ likes: 1 }).toArray();
+            res.send(likes);
+        })
+
+
+        app.put('/like/:id', async (req, res) => {
             try {
-                const post = await postsCollection.findOne({ _id: ObjectId(req.params.id) });
-                if (!post.likes.includes(req.body.userId)) {
-                    await post.updateOne({ $push: { likes: req.body.userId } });
-                    res.status(200).json("The post has been liked");
+                // Find the item in the database
+                console.log(req.body)
+
+                // Find the item in the database
+                const post = await postsCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+                // Check if the user has already liked the item
+                const userAlreadyLiked = post.likes.includes(req.body.user);
+
+                if (userAlreadyLiked) {
+                    // If the user has already liked the item, remove their like
+                    post.likes = post.likes.filter((like) => like.toString() !== req.body.user);
+
                 } else {
-                    await post.updateOne({ $pull: { likes: req.body.userId } });
-                    res.status(200).json("The post has been disliked");
+                    // If the user has not liked the item, add their like
+                    post.likes.push(req.body.user);
                 }
-            } catch (err) {
-                res.status(500).json(err);
+
+                // Save the updated item back to the database
+                await postsCollection.updateOne({ _id: new ObjectId(req.params.id) }, { $set: post });
+
+                // Send the updated item as a response
+                res.send(post);
+            } catch (error) {
+                res.status(400).send({ error: error.message });
             }
         });
-
-        // app.put('/like/:id', async (req, res) => {
-        //     try {
-        //         const post = await postsCollection.findOne({ _id: ObjectId() });
-        //         if (!post.likes.includes(req.body.userId)) {
-        //             await post.updateOne({ $push: { likes: req.body.userId } })
-        //             res.status(200).json("The post has been liked")
-        //         }
-        //         else {
-        //             await post.updateOne({ $pull: { likes: req.body.userId } })
-        //             res.status(200).json("The post has been disliked")
-        //         }
-        //         res.send(post)
-        //     } catch (err) {
-        //         res.status(500).json(err)
-
-        //     }
-        // })
-
     }
+
+
     finally { }
 }
 
